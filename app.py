@@ -1,72 +1,69 @@
-import requests
-import streamlit as st
-import pandas as pd
-import io
-import json
+import requests import json import streamlit as st
 
-# Получаем WEBHOOK_URL из secrets
+Чтение секрета из Streamlit secrets
+
 WEBHOOK_URL = st.secrets["WEBHOOK_URL"]
-TASK_ENDPOINT = WEBHOOK_URL + 'tasks.task.get'
-COMMENTS_ENDPOINT = WEBHOOK_URL + 'task.commentitem.getlist'
 
-# Функции
-def fetch_task(task_id):
-    params = {'taskId': task_id}
-    response = requests.post(TASK_ENDPOINT, params=params).json()
-    if 'result' in response and 'task' in response['result']:
-        return response['result']['task']
-    else:
-        st.error(f"Не удалось получить задачу {task_id}. Ответ: {response}")
-        return None
+ID задачи для выгрузки
 
-def fetch_comments(task_id):
+TASK_ID = 11559
+
+Функция для запроса задачи
+
+def get_task(task_id): url = f"{WEBHOOK_URL}tasks.task.get" params = { "taskId": task_id } response = requests.get(url, params=params) return response.json()
+
+Функция для запроса истории задачи
+
+def get_task_history(task_id): url = f"{WEBHOOK_URL}task.history.list" params = { "TASK_ID": task_id } response = requests.get(url, params=params) return response.json()
+
+Функция для запроса комментариев задачи
+
+def get_task_comments(task_id): url = f"{WEBHOOK_URL}task.commentitem.getlist" params = { "TASKID": task_id } response = requests.get(url, params=params) return response.json()
+
+Основной процесс
+
+if name == "main": st.title("Экспорт задачи Bitrix24 в JSON")
+
+task_id = st.number_input("Введите ID задачи", value=TASK_ID)
+if st.button("Выгрузить задачу"):
+    task_data = get_task(task_id)
+    history_data = get_task_history(task_id)
+    comments_data = get_task_comments(task_id)
+
+    # Извлечь основные данные задачи
+    task = task_data.get("result", {}).get("task", {})
+
+    # Извлечь переносы сроков
+    deadline_changes = []
+    for event in history_data.get("result", []):
+        if event.get("FIELD") == "DEADLINE":
+            change = {
+                "changed_by": event.get("USER_ID"),
+                "changed_date": event.get("CREATED_DATE"),
+                "old_deadline": event.get("FROM_VALUE"),
+                "new_deadline": event.get("TO_VALUE")
+            }
+            deadline_changes.append(change)
+
+    task["deadline_changes"] = deadline_changes
+
+    # Извлечь комментарии
     comments = []
-    start = 0
-    while True:
-        params = {'TASK_ID': task_id, 'start': start}
-        response = requests.post(COMMENTS_ENDPOINT, params=params).json()
-        if 'result' not in response or 'commentItems' not in response['result']:
-            st.error(f"Не удалось получить комментарии для задачи {task_id}. Ответ: {response}")
-            break
-        batch = response['result']['commentItems']
-        comments.extend(batch)
-        if 'next' in response['result']:
-            start = response['result']['next']
-        else:
-            break
-    return comments
+    for comment in comments_data.get("result", []):
+        comments.append({
+            "author_id": comment.get("AUTHOR_ID"),
+            "post_date": comment.get("POST_DATE"),
+            "message": comment.get("POST_MESSAGE")
+        })
 
-def create_json_download(data, filename):
-    json_data = json.dumps(data, ensure_ascii=False, indent=2)
-    b = io.BytesIO()
-    b.write(json_data.encode('utf-8'))
-    b.seek(0)
-    st.download_button(
-        label=f"Скачать {filename}",
-        data=b,
-        file_name=filename,
-        mime='application/json'
-    )
+    task["comments"] = comments
 
-# Streamlit-приложение
-st.title("Экспорт одной задачи Bitrix24 в JSON")
+    # Сохраняем в JSON
+    filename = f"task_{task_id}.json"
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(task, f, indent=2, ensure_ascii=False)
 
-task_id = st.text_input("Введите ID задачи:")
+    st.success(f"Задача {task_id} успешно выгружена с историей переносов дедлайна и комментариями.")
+    with open(filename, "r", encoding="utf-8") as f:
+        st.download_button('Скачать JSON', f, file_name=filename, mime='application/json')
 
-if st.button("Выгрузить задачу и комментарии"):
-    if not task_id.strip():
-        st.warning("Пожалуйста, введите ID задачи.")
-    else:
-        task_data = fetch_task(task_id)
-        if task_data:
-            st.subheader("Информация о задаче")
-            st.json(task_data)
-            create_json_download(task_data, f"task_{task_id}.json")
-
-            comments = fetch_comments(task_id)
-            if comments:
-                st.subheader("Комментарии к задаче")
-                st.json(comments)
-                create_json_download(comments, f"comments_task_{task_id}.json")
-            else:
-                st.info("У задачи нет комментариев.")
