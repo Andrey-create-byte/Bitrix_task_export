@@ -4,27 +4,19 @@ import requests import json import streamlit as st
 
 WEBHOOK_URL = st.secrets["WEBHOOK_URL"]
 
-ID задачи для выгрузки
+Функции для запросов к Bitrix24 API
 
-TASK_ID = 11559
+def get_task(task_id): url = f"{WEBHOOK_URL}tasks.task.get" params = {"taskId": task_id} response = requests.get(url, params=params) return response.json()
 
-Функция для запроса задачи
+def get_task_history(task_id): url = f"{WEBHOOK_URL}task.history.list" params = {"TASK_ID": task_id} response = requests.get(url, params=params) return response.json()
 
-def get_task(task_id): url = f"{WEBHOOK_URL}tasks.task.get" params = { "taskId": task_id } response = requests.get(url, params=params) return response.json()
-
-Функция для запроса истории задачи
-
-def get_task_history(task_id): url = f"{WEBHOOK_URL}task.history.list" params = { "TASK_ID": task_id } response = requests.get(url, params=params) return response.json()
-
-Функция для запроса комментариев задачи
-
-def get_task_comments(task_id): url = f"{WEBHOOK_URL}task.commentitem.getlist" params = { "TASKID": task_id } response = requests.get(url, params=params) return response.json()
+def get_task_comments(task_id): url = f"{WEBHOOK_URL}task.commentitem.getlist" params = {"TASKID": task_id} response = requests.get(url, params=params) return response.json()
 
 Основной процесс
 
 if name == "main": st.title("Экспорт задачи Bitrix24 в JSON")
 
-task_id = st.number_input("Введите ID задачи", value=TASK_ID)
+task_id = st.number_input("Введите ID задачи", value=11559)
 if st.button("Выгрузить задачу"):
     task_data = get_task(task_id)
     history_data = get_task_history(task_id)
@@ -50,10 +42,15 @@ if st.button("Выгрузить задачу"):
     # Извлечь комментарии
     comments = []
     for comment in comments_data.get("result", []):
+        message = comment.get("POST_MESSAGE", "")
+        if not message and "POST_MESSAGE_HTML" in comment:
+            message = comment.get("POST_MESSAGE_HTML", "")
+
         comments.append({
             "author_id": comment.get("AUTHOR_ID"),
+            "author_name": comment.get("AUTHOR_NAME"),
             "post_date": comment.get("POST_DATE"),
-            "message": comment.get("POST_MESSAGE")
+            "message": message
         })
 
     task["comments"] = comments
