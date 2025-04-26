@@ -7,26 +7,28 @@ WEBHOOK_URL = st.secrets["WEBHOOK_URL"]
 
 # Функции для запросов к Bitrix24 API
 def get_task(task_id):
-    url = f"{WEBHOOK_URL}tasks.task.get"
+    url = f"{WEBHOOK_URL}tasks.task.get.json"
     params = {"taskId": task_id}
     response = requests.get(url, params=params)
     return response.json()
 
 def get_task_comments(task_id):
-    url = f"{WEBHOOK_URL}task.commentitem.getlist"
+    url = f"{WEBHOOK_URL}task.commentitem.getlist.json"
     params = {"TASKID": task_id}
     response = requests.get(url, params=params)
     return response.json()
 
 def get_task_history(task_id):
-    url = f"{WEBHOOK_URL}task.history.list"
-    params = {"TASK_ID": task_id}
-    response = requests.get(url, params=params)
+    url = f"{WEBHOOK_URL}tasks.task.history.list.json"
+    payload = {
+        "taskId": task_id
+    }
+    response = requests.post(url, json=payload)
     return response.json()
 
 # Основной процесс
 if __name__ == "__main__":
-    st.title("Экспорт задачи Bitrix24: задача, RAW комментарии и история изменений")
+    st.title("Экспорт задачи Bitrix24: задача, RAW комментарии и история изменений (правильный метод)")
 
     task_id = st.number_input("Введите ID задачи", value=11559)
     if st.button("Выгрузить данные"):
@@ -52,10 +54,10 @@ if __name__ == "__main__":
         with open(filename_json_comments, "r", encoding="utf-8") as f:
             st.download_button('Скачать RAW JSON комментариев', f, file_name=filename_json_comments, mime='application/json')
 
-        # 4. Сохраняем историю изменений в TXT
-        filename_txt_history = f"task_{task_id}_history.txt"
-        with open(filename_txt_history, "w", encoding="utf-8") as f:
+        # 4. Сохраняем историю изменений в JSON
+        filename_json_history = f"task_{task_id}_history.json"
+        with open(filename_json_history, "w", encoding="utf-8") as f:
             json.dump(history_data_raw, f, indent=2, ensure_ascii=False)
 
-        with open(filename_txt_history, "r", encoding="utf-8") as f:
-            st.download_button('Скачать RAW JSON истории изменений', f, file_name=filename_txt_history, mime='application/json')
+        with open(filename_json_history, "r", encoding="utf-8") as f:
+            st.download_button('Скачать JSON истории изменений', f, file_name=filename_json_history, mime='application/json')
