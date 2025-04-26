@@ -26,7 +26,7 @@ def get_task_history(task_id):
 
 # Основной процесс
 if __name__ == "__main__":
-    st.title("Экспорт задачи Bitrix24 с комментариями и историей")
+    st.title("Экспорт задачи Bitrix24: задача, комментарии (RAW) и история изменений")
 
     task_id = st.number_input("Введите ID задачи", value=11559)
     if st.button("Выгрузить задачу, комментарии и историю"):
@@ -36,69 +36,26 @@ if __name__ == "__main__":
         comments_data_raw = get_task_comments(task_id)
         history_data_raw = get_task_history(task_id)
 
-        # Извлечение данных о задаче
+        # 1. Сохраняем задачу в JSON
         task = task_data.get("result", {}).get("task", {})
-
-        # Корректная обработка комментариев
-        comments = []
-        if comments_data_raw and isinstance(comments_data_raw, dict):
-            result = comments_data_raw.get("result")
-            if isinstance(result, list):
-                comments = result
-
-        # Корректная обработка истории изменений
-        history = []
-        if history_data_raw and isinstance(history_data_raw, dict):
-            result = history_data_raw.get("result")
-            if isinstance(result, list):
-                history = result
-
-        # Сохраняем JSON задачи
-        filename_json = f"task_{task_id}.json"
-        with open(filename_json, "w", encoding="utf-8") as f:
+        filename_json_task = f"task_{task_id}.json"
+        with open(filename_json_task, "w", encoding="utf-8") as f:
             json.dump(task, f, indent=2, ensure_ascii=False)
 
-        st.success(f"Задача {task_id} успешно выгружена.")
-        with open(filename_json, "r", encoding="utf-8") as f:
-            st.download_button('Скачать JSON задачи', f, file_name=filename_json, mime='application/json')
+        with open(filename_json_task, "r", encoding="utf-8") as f:
+            st.download_button('Скачать JSON задачи', f, file_name=filename_json_task, mime='application/json')
 
-        # Сохраняем комментарии в TXT
-        filename_txt_comments = f"task_{task_id}_comments.txt"
-        with open(filename_txt_comments, "w", encoding="utf-8") as f:
-            if not comments:
-                f.write("Комментариев нет.\n")
-            else:
-                f.write(f"Всего комментариев: {len(comments)}\n\n")
-                for idx, comment in enumerate(comments, start=1):
-                    author = comment.get("AUTHOR_NAME", "Неизвестный автор")
-                    date = comment.get("POST_DATE", "Нет даты")
+        # 2. Сохраняем сырые комментарии в JSON без обработки
+        filename_json_comments = f"task_{task_id}_raw_comments.json"
+        with open(filename_json_comments, "w", encoding="utf-8") as f:
+            json.dump(comments_data_raw, f, indent=2, ensure_ascii=False)
 
-                    # Корректная обработка POST_MESSAGE
-                    message = ""
-                    if isinstance(comment.get("POST_MESSAGE"), dict):
-                        message = comment.get("POST_MESSAGE", {}).get("VALUE", "")
-                    else:
-                        message = comment.get("POST_MESSAGE", "")
+        with open(filename_json_comments, "r", encoding="utf-8") as f:
+            st.download_button('Скачать RAW JSON комментариев', f, file_name=filename_json_comments, mime='application/json')
 
-                    if not message:
-                        if isinstance(comment.get("POST_MESSAGE_HTML"), dict):
-                            message = comment.get("POST_MESSAGE_HTML", {}).get("VALUE", "")
-                        else:
-                            message = comment.get("POST_MESSAGE_HTML", "")
+        # 3. Сохраняем историю изменений в TXT
+        history = history_data_raw.get("result", []) if isinstance(history_data_raw, dict) else []
 
-                    if not message:
-                        message = "Комментарий отсутствует"
-
-                    f.write(f"Комментарий №{idx}\n")
-                    f.write(f"Автор: {author}\n")
-                    f.write(f"Дата: {date}\n")
-                    f.write(f"Сообщение:\n{message}\n")
-                    f.write("-" * 50 + "\n\n")
-
-        with open(filename_txt_comments, "r", encoding="utf-8") as f:
-            st.download_button('Скачать TXT комментариев', f, file_name=filename_txt_comments, mime='text/plain')
-
-        # Сохраняем историю изменений в TXT
         filename_txt_history = f"task_{task_id}_history.txt"
         with open(filename_txt_history, "w", encoding="utf-8") as f:
             if not history:
