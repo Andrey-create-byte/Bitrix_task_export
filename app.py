@@ -39,17 +39,19 @@ if __name__ == "__main__":
         # Извлечение данных о задаче
         task = task_data.get("result", {}).get("task", {})
 
-        # Обработка комментариев
-        if isinstance(comments_data_raw, dict):
-            comments = comments_data_raw.get("result", [])
-        else:
-            comments = comments_data_raw
+        # Корректная обработка комментариев
+        comments = []
+        if comments_data_raw and isinstance(comments_data_raw, dict):
+            result = comments_data_raw.get("result")
+            if isinstance(result, list):
+                comments = result
 
-        # Обработка истории изменений
-        if isinstance(history_data_raw, dict):
-            history = history_data_raw.get("result", [])
-        else:
-            history = history_data_raw
+        # Корректная обработка истории изменений
+        history = []
+        if history_data_raw and isinstance(history_data_raw, dict):
+            result = history_data_raw.get("result")
+            if isinstance(result, list):
+                history = result
 
         # Сохраняем JSON задачи
         filename_json = f"task_{task_id}.json"
@@ -70,17 +72,20 @@ if __name__ == "__main__":
                 for idx, comment in enumerate(comments, start=1):
                     author = comment.get("AUTHOR_NAME", "Неизвестный автор")
                     date = comment.get("POST_DATE", "Нет даты")
-                    # Правильная обработка POST_MESSAGE
+
+                    # Корректная обработка POST_MESSAGE
                     message = ""
                     if isinstance(comment.get("POST_MESSAGE"), dict):
                         message = comment.get("POST_MESSAGE", {}).get("VALUE", "")
                     else:
                         message = comment.get("POST_MESSAGE", "")
+
                     if not message:
                         if isinstance(comment.get("POST_MESSAGE_HTML"), dict):
                             message = comment.get("POST_MESSAGE_HTML", {}).get("VALUE", "")
                         else:
                             message = comment.get("POST_MESSAGE_HTML", "")
+
                     if not message:
                         message = "Комментарий отсутствует"
 
