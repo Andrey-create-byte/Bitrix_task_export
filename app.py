@@ -31,23 +31,20 @@ if __name__ == "__main__":
     task_id = st.number_input("Введите ID задачи", value=11559)
     if st.button("Выгрузить данные"):
 
-        # Запросы данных
+        # 1. Загружаем все данные
         task_data = get_task(task_id)
         comments_data_raw = get_task_comments(task_id)
         history_data_raw = get_task_history(task_id)
 
-        # 1. Сохраняем задачу в JSON
-        task = task_data.get("result", {}).get("task", {})
+        # 2. Сохраняем JSON задачи
         filename_json_task = f"task_{task_id}.json"
         with open(filename_json_task, "w", encoding="utf-8") as f:
-            json.dump(task, f, indent=2, ensure_ascii=False)
+            json.dump(task_data, f, indent=2, ensure_ascii=False)
 
         with open(filename_json_task, "r", encoding="utf-8") as f:
             st.download_button('Скачать JSON задачи', f, file_name=filename_json_task, mime='application/json')
 
-        # 2. Сохраняем сырые комментарии в JSON
-        comments_list = comments_data_raw.get("result", []) if isinstance(comments_data_raw, dict) else []
-
+        # 3. Сохраняем RAW комментарии в JSON
         filename_json_comments = f"task_{task_id}_raw_comments.json"
         with open(filename_json_comments, "w", encoding="utf-8") as f:
             json.dump(comments_data_raw, f, indent=2, ensure_ascii=False)
@@ -55,35 +52,10 @@ if __name__ == "__main__":
         with open(filename_json_comments, "r", encoding="utf-8") as f:
             st.download_button('Скачать RAW JSON комментариев', f, file_name=filename_json_comments, mime='application/json')
 
-        # Информация пользователю
-        if comments_list:
-            st.success(f"Комментариев получено: {len(comments_list)}")
-        else:
-            st.warning("Комментариев к задаче нет.")
-
-        # 3. Сохраняем историю изменений в TXT
-        history_list = history_data_raw.get("result", []) if isinstance(history_data_raw, dict) else []
-
+        # 4. Сохраняем историю изменений в TXT
         filename_txt_history = f"task_{task_id}_history.txt"
         with open(filename_txt_history, "w", encoding="utf-8") as f:
-            if not history_list:
-                f.write("История изменений отсутствует.\n")
-            else:
-                f.write(f"Всего событий в истории: {len(history_list)}\n\n")
-                for idx, event in enumerate(history_list, start=1):
-                    field = event.get("FIELD", "Не указано")
-                    from_value = event.get("FROM_VALUE", "")
-                    to_value = event.get("TO_VALUE", "")
-                    created_date = event.get("CREATED_DATE", "")
-                    user_id = event.get("USER_ID", "")
-
-                    f.write(f"Изменение №{idx}\n")
-                    f.write(f"Дата изменения: {created_date}\n")
-                    f.write(f"Поле: {field}\n")
-                    f.write(f"Старое значение: {from_value}\n")
-                    f.write(f"Новое значение: {to_value}\n")
-                    f.write(f"Изменил пользователь (ID): {user_id}\n")
-                    f.write("-" * 50 + "\n\n")
+            json.dump(history_data_raw, f, indent=2, ensure_ascii=False)
 
         with open(filename_txt_history, "r", encoding="utf-8") as f:
-            st.download_button('Скачать TXT истории изменений', f, file_name=filename_txt_history, mime='text/plain')
+            st.download_button('Скачать RAW JSON истории изменений', f, file_name=filename_txt_history, mime='application/json')
