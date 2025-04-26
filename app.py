@@ -26,10 +26,10 @@ def get_task_history(task_id):
 
 # Основной процесс
 if __name__ == "__main__":
-    st.title("Экспорт задачи Bitrix24: задача, комментарии (RAW) и история изменений")
+    st.title("Экспорт задачи Bitrix24: задача, RAW комментарии и история изменений")
 
     task_id = st.number_input("Введите ID задачи", value=11559)
-    if st.button("Выгрузить задачу, комментарии и историю"):
+    if st.button("Выгрузить данные"):
 
         # Запросы данных
         task_data = get_task(task_id)
@@ -45,7 +45,9 @@ if __name__ == "__main__":
         with open(filename_json_task, "r", encoding="utf-8") as f:
             st.download_button('Скачать JSON задачи', f, file_name=filename_json_task, mime='application/json')
 
-        # 2. Сохраняем сырые комментарии в JSON без обработки
+        # 2. Сохраняем сырые комментарии в JSON
+        comments_list = comments_data_raw.get("result", []) if isinstance(comments_data_raw, dict) else []
+
         filename_json_comments = f"task_{task_id}_raw_comments.json"
         with open(filename_json_comments, "w", encoding="utf-8") as f:
             json.dump(comments_data_raw, f, indent=2, ensure_ascii=False)
@@ -53,16 +55,22 @@ if __name__ == "__main__":
         with open(filename_json_comments, "r", encoding="utf-8") as f:
             st.download_button('Скачать RAW JSON комментариев', f, file_name=filename_json_comments, mime='application/json')
 
+        # Информация пользователю
+        if comments_list:
+            st.success(f"Комментариев получено: {len(comments_list)}")
+        else:
+            st.warning("Комментариев к задаче нет.")
+
         # 3. Сохраняем историю изменений в TXT
-        history = history_data_raw.get("result", []) if isinstance(history_data_raw, dict) else []
+        history_list = history_data_raw.get("result", []) if isinstance(history_data_raw, dict) else []
 
         filename_txt_history = f"task_{task_id}_history.txt"
         with open(filename_txt_history, "w", encoding="utf-8") as f:
-            if not history:
+            if not history_list:
                 f.write("История изменений отсутствует.\n")
             else:
-                f.write(f"Всего событий в истории: {len(history)}\n\n")
-                for idx, event in enumerate(history, start=1):
+                f.write(f"Всего событий в истории: {len(history_list)}\n\n")
+                for idx, event in enumerate(history_list, start=1):
                     field = event.get("FIELD", "Не указано")
                     from_value = event.get("FROM_VALUE", "")
                     to_value = event.get("TO_VALUE", "")
