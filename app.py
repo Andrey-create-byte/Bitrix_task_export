@@ -12,46 +12,46 @@ def get_task(task_id):
     response = requests.get(url, params=params)
     return response.json()
 
-def get_task_history(task_id):
-    url = f"{WEBHOOK_URL}task.history.list"
-    params = {"TASK_ID": task_id}
-    response = requests.get(url, params=params)
-    return response.json()
-
 def get_task_comments(task_id):
     url = f"{WEBHOOK_URL}task.commentitem.getlist"
     params = {"TASKID": task_id}
     response = requests.get(url, params=params)
     return response.json()
 
+def get_task_history(task_id):
+    url = f"{WEBHOOK_URL}task.history.list"
+    params = {"TASK_ID": task_id}
+    response = requests.get(url, params=params)
+    return response.json()
+
 # Основной процесс
 if __name__ == "__main__":
-    st.title("Экспорт задачи Bitrix24 в JSON и комментариев в TXT")
+    st.title("Экспорт задачи Bitrix24 с комментариями и историей")
 
     task_id = st.number_input("Введите ID задачи", value=11559)
-    if st.button("Выгрузить задачу и комментарии"):
-        # Запрос задачи, истории и комментариев
-        task_data = get_task(task_id)
-        history_data = get_task_history(task_id)
-        comments_data_raw = get_task_comments(task_id)
+    if st.button("Выгрузить задачу, комментарии и историю"):
 
-        # Извлечь основные данные задачи
+        # Запросы данных
+        task_data = get_task(task_id)
+        comments_data_raw = get_task_comments(task_id)
+        history_data_raw = get_task_history(task_id)
+
+        # Извлечение данных о задаче
         task = task_data.get("result", {}).get("task", {})
 
-        # Извлечь переносы сроков
-        deadline_changes = []
-        for event in history_data.get("result", []):
-            if event.get("FIELD") == "DEADLINE":
-                change = {
-                    "changed_by": event.get("USER_ID"),
-                    "changed_date": event.get("CREATED_DATE"),
-                    "old_deadline": event.get("FROM_VALUE"),
-                    "new_deadline": event.get("TO_VALUE")
-                }
-                deadline_changes.append(change)
-        task["deadline_changes"] = deadline_changes
+        # Обработка комментариев
+        if isinstance(comments_data_raw, dict):
+            comments = comments_data_raw.get("result", [])
+        else:
+            comments = comments_data_raw
 
-        # Сохраняем JSON с задачей
+        # Обработка истории изменений
+        if isinstance(history_data_raw, dict):
+            history = history_data_raw.get("result", [])
+        else:
+            history = history_data_raw
+
+        # Сохраняем JSON задачи
         filename_json = f"task_{task_id}.json"
         with open(filename_json, "w", encoding="utf-8") as f:
             json.dump(task, f, indent=2, ensure_ascii=False)
@@ -60,43 +60,60 @@ if __name__ == "__main__":
         with open(filename_json, "r", encoding="utf-8") as f:
             st.download_button('Скачать JSON задачи', f, file_name=filename_json, mime='application/json')
 
-        # Теперь обработка комментариев в TXT
-        if isinstance(comments_data_raw, dict):
-            comments = comments_data_raw.get("result", [])
-        else:
-            comments = comments_data_raw
-
-        filename_txt = f"task_{task_id}_comments.txt"
-        with open(filename_txt, "w", encoding="utf-8") as txtfile:
+        # Сохраняем комментарии в TXT
+        filename_txt_comments = f"task_{task_id}_comments.txt"
+        with open(filename_txt_comments, "w", encoding="utf-8") as f:
             if not comments:
-                txtfile.write("Комментариев нет.\n")
+                f.write("Комментариев нет.\n")
             else:
-                txtfile.write(f"Всего комментариев: {len(comments)}\n\n")
+                f.write(f"Всего комментариев: {len(comments)}\n\n")
                 for idx, comment in enumerate(comments, start=1):
                     author = comment.get("AUTHOR_NAME", "Неизвестный автор")
                     date = comment.get("POST_DATE", "Нет даты")
-
                     # Правильная обработка POST_MESSAGE
                     message = ""
                     if isinstance(comment.get("POST_MESSAGE"), dict):
                         message = comment.get("POST_MESSAGE", {}).get("VALUE", "")
                     else:
                         message = comment.get("POST_MESSAGE", "")
-
                     if not message:
                         if isinstance(comment.get("POST_MESSAGE_HTML"), dict):
                             message = comment.get("POST_MESSAGE_HTML", {}).get("VALUE", "")
                         else:
                             message = comment.get("POST_MESSAGE_HTML", "")
-
                     if not message:
                         message = "Комментарий отсутствует"
 
-                    txtfile.write(f"Комментарий №{idx}\n")
-                    txtfile.write(f"Автор: {author}\n")
-                    txtfile.write(f"Дата: {date}\n")
-                    txtfile.write(f"Сообщение:\n{message}\n")
-                    txtfile.write("-" * 50 + "\n\n")
+                    f.write(f"Комментарий №{idx}\n")
+                    f.write(f"Автор: {author}\n")
+                    f.write(f"Дата: {date}\n")
+                    f.write(f"Сообщение:\n{message}\n")
+                    f.write("-" * 50 + "\n\n")
 
-        with open(filename_txt, "r", encoding="utf-8") as f:
-            st.download_button('Скачать TXT комментариев', f, file_name=filename_txt, mime='text/plain')
+        with open(filename_txt_comments, "r", encoding="utf-8") as f:
+            st.download_button('Скачать TXT комментариев', f, file_name=filename_txt_comments, mime='text/plain')
+
+        # Сохраняем историю изменений в TXT
+        filename_txt_history = f"task_{task_id}_history.txt"
+        with open(filename_txt_history, "w", encoding="utf-8") as f:
+            if not history:
+                f.write("История изменений отсутствует.\n")
+            else:
+                f.write(f"Всего событий в истории: {len(history)}\n\n")
+                for idx, event in enumerate(history, start=1):
+                    field = event.get("FIELD", "Не указано")
+                    from_value = event.get("FROM_VALUE", "")
+                    to_value = event.get("TO_VALUE", "")
+                    created_date = event.get("CREATED_DATE", "")
+                    user_id = event.get("USER_ID", "")
+
+                    f.write(f"Изменение №{idx}\n")
+                    f.write(f"Дата изменения: {created_date}\n")
+                    f.write(f"Поле: {field}\n")
+                    f.write(f"Старое значение: {from_value}\n")
+                    f.write(f"Новое значение: {to_value}\n")
+                    f.write(f"Изменил пользователь (ID): {user_id}\n")
+                    f.write("-" * 50 + "\n\n")
+
+        with open(filename_txt_history, "r", encoding="utf-8") as f:
+            st.download_button('Скачать TXT истории изменений', f, file_name=filename_txt_history, mime='text/plain')
