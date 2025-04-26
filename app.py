@@ -1,6 +1,5 @@
 import requests
 import json
-import csv
 import streamlit as st
 
 # Чтение секрета из Streamlit secrets
@@ -27,7 +26,7 @@ def get_task_comments(task_id):
 
 # Основной процесс
 if __name__ == "__main__":
-    st.title("Экспорт задачи Bitrix24 в JSON и комментариев в CSV")
+    st.title("Экспорт задачи Bitrix24 в JSON и комментариев в TXT")
 
     task_id = st.number_input("Введите ID задачи", value=11559)
     if st.button("Выгрузить задачу и комментарии"):
@@ -61,22 +60,23 @@ if __name__ == "__main__":
         with open(filename_json, "r", encoding="utf-8") as f:
             st.download_button('Скачать JSON задачи', f, file_name=filename_json, mime='application/json')
 
-        # Теперь обработка комментариев и сохранение в CSV
+        # Теперь обработка комментариев в TXT
         comments = comments_data.get("result", [])
-        filename_csv = f"task_{task_id}_comments.csv"
-        with open(filename_csv, mode="w", newline="", encoding="utf-8") as csvfile:
-            fieldnames = ["№", "Автор", "Дата", "Текст комментария"]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
+        filename_txt = f"task_{task_id}_comments.txt"
+        with open(filename_txt, "w", encoding="utf-8") as txtfile:
+            if not comments:
+                txtfile.write("Комментариев нет.\n")
+            else:
+                for idx, comment in enumerate(comments, start=1):
+                    author = comment.get("AUTHOR_NAME", "Неизвестный автор")
+                    date = comment.get("POST_DATE", "Нет даты")
+                    message = comment.get("POST_MESSAGE") or comment.get("POST_MESSAGE_HTML") or "Комментарий отсутствует"
+                    
+                    txtfile.write(f"Комментарий №{idx}\n")
+                    txtfile.write(f"Автор: {author}\n")
+                    txtfile.write(f"Дата: {date}\n")
+                    txtfile.write(f"Сообщение:\n{message}\n")
+                    txtfile.write("-" * 50 + "\n\n")
 
-            for idx, comment in enumerate(comments, start=1):
-                message = comment.get("POST_MESSAGE") or comment.get("POST_MESSAGE_HTML") or "Комментарий отсутствует"
-                writer.writerow({
-                    "№": idx,
-                    "Автор": comment.get("AUTHOR_NAME", "Неизвестный автор"),
-                    "Дата": comment.get("POST_DATE", "Нет даты"),
-                    "Текст комментария": message
-                })
-
-        with open(filename_csv, "r", encoding="utf-8") as f:
-            st.download_button('Скачать CSV комментариев', f, file_name=filename_csv, mime='text/csv')
+        with open(filename_txt, "r", encoding="utf-8") as f:
+            st.download_button('Скачать TXT комментариев', f, file_name=filename_txt, mime='text/plain')
