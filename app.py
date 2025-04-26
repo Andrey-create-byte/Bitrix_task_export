@@ -33,7 +33,7 @@ if __name__ == "__main__":
         # Запрос задачи, истории и комментариев
         task_data = get_task(task_id)
         history_data = get_task_history(task_id)
-        comments_data = get_task_comments(task_id)
+        comments_data_raw = get_task_comments(task_id)
 
         # Извлечь основные данные задачи
         task = task_data.get("result", {}).get("task", {})
@@ -61,17 +61,37 @@ if __name__ == "__main__":
             st.download_button('Скачать JSON задачи', f, file_name=filename_json, mime='application/json')
 
         # Теперь обработка комментариев в TXT
-        comments = comments_data.get("result", [])
+        if isinstance(comments_data_raw, dict):
+            comments = comments_data_raw.get("result", [])
+        else:
+            comments = comments_data_raw
+
         filename_txt = f"task_{task_id}_comments.txt"
         with open(filename_txt, "w", encoding="utf-8") as txtfile:
             if not comments:
                 txtfile.write("Комментариев нет.\n")
             else:
+                txtfile.write(f"Всего комментариев: {len(comments)}\n\n")
                 for idx, comment in enumerate(comments, start=1):
                     author = comment.get("AUTHOR_NAME", "Неизвестный автор")
                     date = comment.get("POST_DATE", "Нет даты")
-                    message = comment.get("POST_MESSAGE") or comment.get("POST_MESSAGE_HTML") or "Комментарий отсутствует"
-                    
+
+                    # Правильная обработка POST_MESSAGE
+                    message = ""
+                    if isinstance(comment.get("POST_MESSAGE"), dict):
+                        message = comment.get("POST_MESSAGE", {}).get("VALUE", "")
+                    else:
+                        message = comment.get("POST_MESSAGE", "")
+
+                    if not message:
+                        if isinstance(comment.get("POST_MESSAGE_HTML"), dict):
+                            message = comment.get("POST_MESSAGE_HTML", {}).get("VALUE", "")
+                        else:
+                            message = comment.get("POST_MESSAGE_HTML", "")
+
+                    if not message:
+                        message = "Комментарий отсутствует"
+
                     txtfile.write(f"Комментарий №{idx}\n")
                     txtfile.write(f"Автор: {author}\n")
                     txtfile.write(f"Дата: {date}\n")
